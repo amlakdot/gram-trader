@@ -150,8 +150,8 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
         </div>
         <div>
-          <h1>GRAM Trader</h1>
-          <p class="sub">نوسان‌گیری GRAM به USDT با کارمزد واقعی</p>
+          <h1>GRAM Swap</h1>
+          <p class="sub">پیگیری سود/زیان سواپ‌های GRAM ↔ USDT</p>
         </div>
       </div>
       <div class="row">
@@ -212,33 +212,39 @@
       </div>
     </section>
 
+    <section class="card" id="adviceBox" style="margin-bottom:22px">
+      <p class="muted" style="margin:0">راهنمای سواپ بعدی</p>
+      <p id="adviceText" style="margin:6px 0 0;font-weight:600"></p>
+      <p class="muted" id="adviceMeta" style="margin:4px 0 0"></p>
+    </section>
+
     <section style="margin-bottom:22px">
-      <h2>ثبت معامله</h2>
+      <h2>ثبت سواپ</h2>
       <div class="card">
         <div class="seg">
-          <button id="typeBuy" class="on-buy" type="button">خرید GRAM</button>
-          <button id="typeSell" type="button">فروش GRAM</button>
+          <button id="typeBuy" class="on-buy" type="button">سواپ به GRAM</button>
+          <button id="typeSell" type="button">سواپ به USDT</button>
         </div>
         <div class="grid2">
           <div><label>تاریخ و ساعت</label><input id="tDate" type="datetime-local" /></div>
-          <div><label id="gramLbl">مقدار GRAM دریافتی</label><input id="tGram" inputmode="decimal" placeholder="70.40" /></div>
-          <div style="grid-column:1/-1"><label id="usdtLbl">مقدار USDT پرداختی</label><input id="tUsdt" inputmode="decimal" placeholder="106.06" /></div>
+          <div><label id="gramLbl">GRAM دریافتی</label><input id="tGram" inputmode="decimal" placeholder="70.40" /></div>
+          <div style="grid-column:1/-1"><label id="usdtLbl">USDT پرداختی</label><input id="tUsdt" inputmode="decimal" placeholder="106.06" /></div>
         </div>
-        <p class="muted" id="autoFeeHint" style="margin:12px 0 0">کارمزد خودکار از معاملهٔ قبلی</p>
-        <button class="btn btn-primary" id="btnSave" type="button" style="margin-top:12px">ذخیره معامله</button>
+        <p class="muted" id="autoFeeHint" style="margin:12px 0 0">کارمزد خودکار</p>
+        <button class="btn btn-primary" id="btnSave" type="button" style="margin-top:12px">ذخیره سواپ</button>
       </div>
     </section>
 
     <section style="margin-bottom:22px">
-      <h2>اهداف فروش</h2>
+      <h2>اهداف سود سواپ</h2>
       <div class="card" id="targets" style="display:grid;gap:8px;padding:12px"></div>
     </section>
 
     <section style="margin-bottom:22px">
-      <h2>شبیه‌ساز فروش</h2>
+      <h2>شبیه‌ساز سواپ به USDT</h2>
       <div class="card">
         <div class="row" style="align-items:flex-end">
-          <div style="flex:1;min-width:160px"><label>قیمت فروش فرضی</label><input id="simPrice" inputmode="decimal" placeholder="1.55" /></div>
+          <div style="flex:1;min-width:160px"><label>قیمت فرضی سواپ</label><input id="simPrice" inputmode="decimal" placeholder="1.55" /></div>
           <button class="btn btn-primary" id="btnSim" type="button" style="width:auto;padding-inline:20px">محاسبه</button>
         </div>
         <div class="sim hidden" id="simOut"></div>
@@ -257,6 +263,14 @@
   </div>
 
   <div class="toast" id="toast"></div>
+  <div class="modal" id="capitalModal">
+    <div class="card" style="max-width:380px;width:100%">
+      <h2>سرمایهٔ فعلی‌ات چقدر است؟</h2>
+      <p class="muted">مبلغ کل سرمایه‌ای که با آن سواپ می‌کنی را به USDT وارد کن. سود و زیان نسبت به همین عدد حساب می‌شود.</p>
+      <div style="margin-top:12px"><label>سرمایه اولیه (USDT)</label><input id="capInput" inputmode="decimal" placeholder="مثلاً 200" /></div>
+      <button class="btn btn-primary" id="btnCapSave" type="button" style="margin-top:14px">ثبت سرمایه و شروع</button>
+    </div>
+  </div>
   <div class="modal" id="modal">
     <div class="card" style="max-width:380px;width:100%">
       <h2 id="modalTitle">تأیید</h2>
@@ -271,13 +285,11 @@
   <script>
   (function () {
     const DEX = 0.07, NET = 0.0082, ROUND = 0.2, STON = "EQCGScrZe1xbyWqWDvdI6mzP-GAcAWFv6ZXuaJOuSqemxku4";
-    const SEED = [
-      { id: 1, type: "buy", date: "2026-09-30T01:20", gram: 70.403801601, usdt: 106.06, networkFee: 0.008243583, dexFeePct: 0.07, price: 106.06 / 70.403801601 },
-      { id: 2, type: "sell", date: "2026-09-12T22:37", gram: 75.364750959, usdt: 103.57, networkFee: 0.007902632, dexFeePct: 0.07, price: 103.57 / 75.364750959 }
-    ];
-    const KEY = "gram_trades_v2", TGKEY = "gram_telegram_v1", MEMKEY = "gram_alert_mem_v1", PKEY = "gram_price_cache_v1";
+    const SEED = [];
+    const KEY = "gram_trades_v2", CAPKEY = "gram_starting_capital_v1", TGKEY = "gram_telegram_v1", MEMKEY = "gram_alert_mem_v1", PKEY = "gram_price_cache_v1";
 
     let trades = loadTrades();
+    let capital = loadCapital();
     let tg = loadTg();
     let live = null, quote = null, tradeType = "buy", chartDays = 7, chartPts = [], confirmFn = null, fetching = false;
 
@@ -302,6 +314,15 @@
       } catch { return SEED.slice(); }
     }
     function saveTrades() { localStorage.setItem(KEY, JSON.stringify(trades)); }
+    function loadCapital() {
+      try {
+        const raw = localStorage.getItem(CAPKEY);
+        if (raw == null || raw === "") return null;
+        const n = Number(raw);
+        return Number.isFinite(n) && n >= 0 ? n : null;
+      } catch { return null; }
+    }
+    function saveCapital(n) { localStorage.setItem(CAPKEY, String(n)); capital = n; }
     function loadTg() {
       const d = { token: "", chatId: "", enabled: false, alertAbove: "", alertBelow: "", alertTargetPct: "5" };
       try { return { ...d, ...(JSON.parse(localStorage.getItem(TGKEY) || "{}")) }; } catch { return d; }
@@ -335,36 +356,70 @@
       return { taken: amount - rem, cost: cost };
     }
 
-    function calcState(list, price) {
+    function equityAt(cash, inv, price) {
+      let g = 0; for (const lot of inv) g += lot.gram;
+      return cash + (price ? g * price : 0);
+    }
+
+    function calcState(list, price, startCap) {
       const sorted = list.slice().sort((a, b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
-      let totalFeesGram = 0, realizedPnl = 0;
+      let cash = startCap || 0, totalFeesGram = 0, realizedPnl = 0;
       const inv = [];
+      let lastSwapPnl = null, lastSwapPct = null, lastSwapType = null, lastSwapPrice = null;
       for (const t of sorted) {
         const netFee = Math.max(0, t.networkFee || 0);
         const dexPct = Math.max(0, (t.dexFeePct != null ? t.dexFeePct : DEX) / 100);
         totalFeesGram += netFee;
+        const px = t.price > 0 ? t.price : (t.gram > 0 ? t.usdt / t.gram : null);
+        const before = equityAt(cash, inv, px);
         if (t.type === "buy") {
+          cash -= t.usdt;
           let net = t.gram * (1 - dexPct);
           net = Math.max(0, net - netFee);
           if (net > 1e-12) inv.push({ gram: net, costPer: t.usdt / net });
         } else {
-          if (netFee > 0) {
-            const feeTake = takeFromInv(inv, netFee);
-            realizedPnl -= feeTake.cost;
-          }
+          if (netFee > 0) { const feeTake = takeFromInv(inv, netFee); realizedPnl -= feeTake.cost; }
           const sellTake = takeFromInv(inv, t.gram);
-          if (sellTake.taken > 1e-9) {
-            const ratio = t.gram > 0 ? sellTake.taken / t.gram : 0;
-            const netUsdt = t.usdt * (1 - dexPct) * ratio;
-            realizedPnl += netUsdt - sellTake.cost;
-          }
+          const netUsdt = t.usdt * (1 - dexPct);
+          cash += netUsdt;
+          realizedPnl += netUsdt - sellTake.cost;
         }
+        const after = equityAt(cash, inv, px);
+        lastSwapPnl = after - before;
+        lastSwapPct = before !== 0 ? (lastSwapPnl / Math.abs(before)) * 100 : null;
+        lastSwapType = t.type;
+        lastSwapPrice = px;
       }
       let remainingGram = 0, remainingCost = 0;
       for (const lot of inv) { remainingGram += lot.gram; remainingCost += lot.gram * lot.costPer; }
       const avg = remainingGram > 0 ? remainingCost / remainingGram : 0;
       const currentValue = price ? remainingGram * price : 0;
-      return { totalGram: remainingGram, avgBuyPrice: avg, investedUsdt: remainingCost, currentValue, unrealizedPnl: currentValue - remainingCost, totalFeesGram, realizedPnl };
+      const equity = cash + currentValue;
+      return {
+        totalGram: remainingGram, cashUsdt: cash, avgBuyPrice: avg, investedUsdt: remainingCost,
+        currentValue, equity, totalPnl: equity - (startCap || 0),
+        unrealizedPnl: currentValue - remainingCost, totalFeesGram, realizedPnl,
+        startingCapital: startCap || 0, lastSwapPnl, lastSwapPct, lastSwapType, lastSwapPrice
+      };
+    }
+
+    function nextAdvice(s, price) {
+      const pad = 1 - ROUND / 100;
+      if (s.totalGram > 1e-6 && s.avgBuyPrice > 0) {
+        const be = s.avgBuyPrice / pad;
+        let hint = "برای سود، GRAM را بالای " + be.toFixed(4) + " به USDT سواپ کن";
+        if (price > 0 && price >= be) hint = "قیمت الان بالای سربه‌سر است — می‌توانی به USDT سواپ کنی";
+        else if (price > 0) hint = "برای سربه‌سر حدود " + (((be - price) / price) * 100).toFixed(1) + "٪ رشد لازم است";
+        return { breakEven: be, suggest: "to_usdt", hint: hint };
+      }
+      if (s.cashUsdt > 1e-6 && s.lastSwapPrice && s.lastSwapType === "sell") {
+        const tb = s.lastSwapPrice * pad;
+        let hint = "برای سود در دور بعد، زیر " + tb.toFixed(4) + " به GRAM سواپ کن";
+        if (price > 0 && price <= tb) hint = "قیمت الان مناسب خرید است — می‌توانی به GRAM سواپ کنی";
+        return { breakEven: tb, suggest: "to_gram", hint: hint };
+      }
+      if (s.cashUsdt > 1e-6) return { breakEven: price, suggest: "to_gram", hint: "USDT داری — با سواپ به GRAM پوزیشن باز کن" };
+      return { breakEven: null, suggest: null, hint: "هنوز سواپی ثبت نشده" };
     }
 
     async function fetchJson(url, ms) {
@@ -539,10 +594,20 @@
     }
 
     function render() {
-      const s = calcState(trades, live);
+      if (capital == null) {
+        document.getElementById("capitalModal").classList.add("on");
+      } else {
+        document.getElementById("capitalModal").classList.remove("on");
+      }
+      const s = calcState(trades, live, capital || 0);
+      const adv = nextAdvice(s, live);
       const fees = inferFees(trades);
       const hint = document.getElementById("autoFeeHint");
-      if (hint) hint.textContent = "کارمزد خودکار از معاملهٔ قبلی: شبکه " + fmt(fees.networkFee, 5) + " GRAM · DEX " + fmt(fees.dexFeePct, 2) + "٪";
+      if (hint) hint.textContent = "کارمزد خودکار: شبکه " + fmt(fees.networkFee, 5) + " GRAM · DEX " + fmt(fees.dexFeePct, 2) + "٪";
+      document.getElementById("adviceText").textContent = adv.hint;
+      document.getElementById("adviceMeta").textContent = adv.breakEven != null
+        ? ("قیمت مرجع: " + fmt(adv.breakEven, 4) + (adv.suggest === "to_usdt" ? " (سواپ به USDT)" : adv.suggest === "to_gram" ? " (سواپ به GRAM)" : ""))
+        : "";
       document.getElementById("livePrice").textContent = live != null ? fmt(live, 4) : "—";
       const pill = document.getElementById("chgPill");
       if (quote && quote.change24h != null) {
@@ -555,19 +620,19 @@
         ? quote.source + (quote.cached ? " · کش ۴۵ ثانیه‌ای" : "") + (quote.stale ? " · داده قدیمی" : "")
         : "در حال اتصال به بازار…";
 
-      const pnlPct = s.investedUsdt > 0 ? (s.unrealizedPnl / s.investedUsdt) * 100 : 0;
+      const pnlPct = s.startingCapital > 0 ? (s.totalPnl / s.startingCapital) * 100 : 0;
       document.getElementById("stats1").innerHTML =
         stat("موجودی GRAM", fmt(s.totalGram, 4)) +
-        stat("میانگین خرید", s.avgBuyPrice ? fmt(s.avgBuyPrice, 4) : "—", "USDT / GRAM") +
-        stat("سرمایه فعلی", fmt(s.investedUsdt, 2), "USDT") +
-        stat("ارزش لحظه‌ای", live ? fmt(s.currentValue, 2) : "—", live && s.totalGram > 0 ? ((s.unrealizedPnl >= 0 ? "+" : "") + fmt(s.unrealizedPnl, 2) + " USDT") : "", s.unrealizedPnl >= 0 ? "profit" : "loss");
+        stat("موجودی USDT", fmt(s.cashUsdt, 2)) +
+        stat("ارزش کل", live != null ? fmt(s.equity, 2) : "—", "USDT") +
+        stat("سود/زیان از سرمایه", (s.totalPnl >= 0 ? "+" : "") + fmt(s.totalPnl, 2), s.startingCapital > 0 ? ((pnlPct >= 0 ? "+" : "") + pnlPct.toFixed(2) + "٪") : "", s.totalPnl >= 0 ? "profit" : "loss");
       document.getElementById("stats2").innerHTML =
-        stat("سود تحقق‌یافته", (s.realizedPnl >= 0 ? "+" : "") + fmt(s.realizedPnl, 2), "", s.realizedPnl >= 0 ? "profit" : "loss") +
-        stat("کارمزد شبکه", fmt(s.totalFeesGram, 5), "GRAM") +
-        stat("وضعیت پوزیشن", s.totalGram <= 0 ? "بدون پوزیشن" : live ? ((pnlPct >= 0 ? "در سود " : "در زیان ") + Math.abs(pnlPct).toFixed(2) + "٪") : "در انتظار قیمت", "", s.totalGram > 0 && live ? (pnlPct >= 0 ? "profit" : "loss") : "");
+        stat("سود/زیان سواپ آخر", s.lastSwapPnl != null ? ((s.lastSwapPnl >= 0 ? "+" : "") + fmt(s.lastSwapPnl, 2)) : "—", s.lastSwapPct != null ? ((s.lastSwapPct >= 0 ? "+" : "") + s.lastSwapPct.toFixed(2) + "٪") : "", s.lastSwapPnl != null ? (s.lastSwapPnl >= 0 ? "profit" : "loss") : "") +
+        stat("میانگین ورود", s.avgBuyPrice ? fmt(s.avgBuyPrice, 4) : "—", "USDT / GRAM") +
+        stat("سرمایه اولیه", capital != null ? fmt(capital, 2) : "—", "USDT");
 
       const box = document.getElementById("targets");
-      if (s.totalGram <= 0 || !s.avgBuyPrice) box.innerHTML = '<p class="empty">برای دیدن اهداف، ابتدا GRAM بخر</p>';
+      if (s.totalGram <= 0 || !s.avgBuyPrice) box.innerHTML = '<p class="empty">بعد از سواپ به GRAM، اهداف اینجا می‌آید</p>';
       else {
         box.innerHTML = [1, 2, 3, 5, 7, 10, 15, 20].map((pct) => {
           const needed = (s.avgBuyPrice * (1 + pct / 100)) / (1 - ROUND / 100);
@@ -579,9 +644,9 @@
       }
 
       const hist = document.getElementById("history");
-      if (!trades.length) hist.innerHTML = '<p class="empty">هنوز معامله‌ای نیست</p>';
+      if (!trades.length) hist.innerHTML = '<p class="empty">هنوز سواپی نیست</p>';
       else hist.innerHTML = trades.slice().reverse().map((t) =>
-        '<div class="hist"><span class="badge ' + (t.type === "buy" ? "up" : "down") + '">' + (t.type === "buy" ? "خرید" : "فروش") + '</span><div><p style="margin:0;font-weight:700;font-size:14px">' + fmt(t.gram, 4) + " GRAM · " + fmt(t.usdt, 2) + ' USDT</p><p class="muted" style="margin:0">' + faDate(t.date) + " · کارمزد " + fmt(t.networkFee, 5) + '</p></div><div style="text-align:left"><p style="margin:0;font-weight:700;font-size:14px">' + fmt(t.price, 4) + '</p><button class="btn btn-danger" data-id="' + t.id + '" type="button" style="height:28px;padding:0 8px;font-size:12px;margin-top:4px">حذف</button></div></div>'
+        '<div class="hist"><span class="badge ' + (t.type === "buy" ? "up" : "down") + '">' + (t.type === "buy" ? "→GRAM" : "→USDT") + '</span><div><p style="margin:0;font-weight:700;font-size:14px">' + fmt(t.gram, 4) + " GRAM · " + fmt(t.usdt, 2) + ' USDT</p><p class="muted" style="margin:0">' + faDate(t.date) + " · کارمزد " + fmt(t.networkFee, 5) + '</p></div><div style="text-align:left"><p style="margin:0;font-weight:700;font-size:14px">' + fmt(t.price, 4) + '</p><button class="btn btn-danger" data-id="' + t.id + '" type="button" style="height:28px;padding:0 8px;font-size:12px;margin-top:4px">حذف</button></div></div>'
       ).join("");
       hist.querySelectorAll("[data-id]").forEach((b) => b.onclick = () => ask("حذف معامله", "این معامله حذف شود؟", () => {
         trades = trades.filter((x) => x.id !== Number(b.dataset.id)); saveTrades(); render();
@@ -592,7 +657,7 @@
     }
 
     function runSim(price) {
-      const s = calcState(trades, live);
+      const s = calcState(trades, live, capital || 0);
       if (s.totalGram <= 0) { toast("موجودی GRAM نداری"); return; }
       if (!price || price <= 0) { toast("قیمت معتبر وارد کن"); return; }
       const usdtNet = s.totalGram * price * (1 - DEX / 100);
@@ -615,8 +680,8 @@
       tradeType = t;
       document.getElementById("typeBuy").className = t === "buy" ? "on-buy" : "";
       document.getElementById("typeSell").className = t === "sell" ? "on-sell" : "";
-      document.getElementById("gramLbl").textContent = t === "buy" ? "مقدار GRAM دریافتی" : "مقدار GRAM فروخته‌شده";
-      document.getElementById("usdtLbl").textContent = t === "buy" ? "مقدار USDT پرداختی" : "مقدار USDT دریافتی";
+      document.getElementById("gramLbl").textContent = t === "buy" ? "GRAM دریافتی" : "GRAM پرداختی";
+      document.getElementById("usdtLbl").textContent = t === "buy" ? "USDT پرداختی" : "USDT دریافتی";
     }
 
     function bindTg() {
@@ -657,10 +722,6 @@
       const u = Number(document.getElementById("tUsdt").value);
       const date = document.getElementById("tDate").value;
       if (!date || !g || !u || g <= 0 || u <= 0) { toast("مقدار GRAM و USDT را وارد کن"); return; }
-      if (tradeType === "sell") {
-        const avail = calcState(trades, null).totalGram;
-        if (g > avail + 1e-6) { toast("موجودی کافی نیست (حداکثر " + fmt(avail, 4) + " GRAM)"); return; }
-      }
       const fees = inferFees(trades);
       trades.push({
         id: Date.now(), type: tradeType, date, gram: g, usdt: u,
@@ -671,7 +732,14 @@
       saveTrades();
       document.getElementById("tGram").value = "";
       document.getElementById("tUsdt").value = "";
-      toast("معامله ذخیره شد"); render();
+      toast("سواپ ذخیره شد"); render();
+    };
+    document.getElementById("btnCapSave").onclick = () => {
+      const n = Number(document.getElementById("capInput").value);
+      if (!Number.isFinite(n) || n < 0) { toast("مقدار سرمایه را درست وارد کن"); return; }
+      saveCapital(n);
+      toast("سرمایه ثبت شد");
+      render();
     };
     document.getElementById("btnSim").onclick = () => runSim(Number(document.getElementById("simPrice").value));
     document.getElementById("btnClear").onclick = () => ask("پاک‌سازی کامل", "تمام معاملات حذف می‌شود.", () => { trades = []; saveTrades(); render(); toast("تاریخچه پاک شد"); });
@@ -715,7 +783,7 @@
     refreshPrice(false);
     refreshChart();
     setInterval(() => refreshPrice(false), 45000);
-    window.addEventListener("resize", () => drawChart(chartPts, calcState(trades, live).avgBuyPrice || null));
+    window.addEventListener("resize", () => drawChart(chartPts, calcState(trades, live, capital || 0).avgBuyPrice || null));
   })();
   </script>
 </body>
