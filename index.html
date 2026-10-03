@@ -222,11 +222,10 @@
         <div class="grid2">
           <div><label>تاریخ و ساعت</label><input id="tDate" type="datetime-local" /></div>
           <div><label id="gramLbl">مقدار GRAM دریافتی</label><input id="tGram" inputmode="decimal" placeholder="70.40" /></div>
-          <div><label id="usdtLbl">مقدار USDT پرداختی</label><input id="tUsdt" inputmode="decimal" placeholder="106.06" /></div>
-          <div><label>کارمزد شبکه (GRAM)</label><input id="tFee" inputmode="decimal" value="0.0082" /></div>
-          <div><label>کارمزد DEX ٪</label><input id="tDex" inputmode="decimal" value="0.07" /></div>
+          <div style="grid-column:1/-1"><label id="usdtLbl">مقدار USDT پرداختی</label><input id="tUsdt" inputmode="decimal" placeholder="106.06" /></div>
         </div>
-        <button class="btn btn-primary" id="btnSave" type="button" style="margin-top:14px">ذخیره معامله</button>
+        <p class="muted" id="autoFeeHint" style="margin:12px 0 0">کارمزد خودکار از معاملهٔ قبلی</p>
+        <button class="btn btn-primary" id="btnSave" type="button" style="margin-top:12px">ذخیره معامله</button>
       </div>
     </section>
 
@@ -273,8 +272,8 @@
   (function () {
     const DEX = 0.07, NET = 0.0082, ROUND = 0.2, STON = "EQCGScrZe1xbyWqWDvdI6mzP-GAcAWFv6ZXuaJOuSqemxku4";
     const SEED = [
-      { id: 1, type: "sell", date: "2026-09-12T22:37", gram: 75.364750959, usdt: 103.57, networkFee: 0.007902632, dexFeePct: 0.07, price: 103.57 / 75.364750959 },
-      { id: 2, type: "buy", date: "2026-09-30T01:20", gram: 70.403801601, usdt: 106.06, networkFee: 0.008243583, dexFeePct: 0.07, price: 106.06 / 70.403801601 }
+      { id: 1, type: "buy", date: "2026-09-30T01:20", gram: 70.403801601, usdt: 106.06, networkFee: 0.008243583, dexFeePct: 0.07, price: 106.06 / 70.403801601 },
+      { id: 2, type: "sell", date: "2026-09-12T22:37", gram: 75.364750959, usdt: 103.57, networkFee: 0.007902632, dexFeePct: 0.07, price: 103.57 / 75.364750959 }
     ];
     const KEY = "gram_trades_v2", TGKEY = "gram_telegram_v1", MEMKEY = "gram_alert_mem_v1", PKEY = "gram_price_cache_v1";
 
@@ -309,28 +308,56 @@
     }
     function saveTg() { localStorage.setItem(TGKEY, JSON.stringify(tg)); }
 
+    function inferFees(list) {
+      if (!list.length) return { networkFee: NET, dexFeePct: DEX };
+      const sorted = list.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+      const last = sorted[0];
+      const withNet = list.filter((t) => (t.networkFee || 0) > 0);
+      const withDex = list.filter((t) => (t.dexFeePct || 0) > 0);
+      const avgNet = withNet.length ? withNet.reduce((s, t) => s + t.networkFee, 0) / withNet.length : NET;
+      const avgDex = withDex.length ? withDex.reduce((s, t) => s + t.dexFeePct, 0) / withDex.length : DEX;
+      return {
+        networkFee: (last.networkFee || 0) > 0 ? last.networkFee : avgNet,
+        dexFeePct: (last.dexFeePct || 0) > 0 ? last.dexFeePct : avgDex
+      };
+    }
+
+    function takeFromInv(inv, amount) {
+      let rem = amount, cost = 0;
+      while (rem > 1e-9 && inv.length) {
+        const lot = inv[0];
+        const take = Math.min(rem, lot.gram);
+        cost += take * lot.costPer;
+        lot.gram -= take;
+        rem -= take;
+        if (lot.gram < 1e-9) inv.shift();
+      }
+      return { taken: amount - rem, cost: cost };
+    }
+
     function calcState(list, price) {
+      const sorted = list.slice().sort((a, b) => new Date(a.date) - new Date(b.date) || a.id - b.id);
       let totalFeesGram = 0, realizedPnl = 0;
       const inv = [];
-      for (const t of list) {
-        totalFeesGram += t.networkFee || 0;
+      for (const t of sorted) {
+        const netFee = Math.max(0, t.networkFee || 0);
+        const dexPct = Math.max(0, (t.dexFeePct != null ? t.dexFeePct : DEX) / 100);
+        totalFeesGram += netFee;
         if (t.type === "buy") {
-          const net = t.gram * (1 - (t.dexFeePct || DEX) / 100);
-          inv.push({ gram: net, costPer: net > 0 ? t.usdt / net : t.price });
+          let net = t.gram * (1 - dexPct);
+          net = Math.max(0, net - netFee);
+          if (net > 1e-12) inv.push({ gram: net, costPer: t.usdt / net });
         } else {
-          let rem = t.gram, cost = 0;
-          while (rem > 1e-9 && inv.length) {
-            const lot = inv[0];
-            const take = Math.min(rem, lot.gram);
-            cost += take * lot.costPer; lot.gram -= take; rem -= take;
-            if (lot.gram < 1e-9) inv.shift();
+          if (netFee > 0) {
+            const feeTake = takeFromInv(inv, netFee);
+            realizedPnl -= feeTake.cost;
           }
-          if (rem > 0) {
-            const g = inv.reduce((s, l) => s + l.gram, 0);
-            const c = inv.reduce((s, l) => s + l.gram * l.costPer, 0);
-            cost += rem * (g > 0 ? c / g : t.price);
+          const sellTake = takeFromInv(inv, t.gram);
+          if (sellTake.taken > 1e-9) {
+            const ratio = t.gram > 0 ? sellTake.taken / t.gram : 0;
+            const netUsdt = t.usdt * (1 - dexPct) * ratio;
+            realizedPnl += netUsdt - sellTake.cost;
           }
-          realizedPnl += t.usdt - cost;
         }
       }
       let remainingGram = 0, remainingCost = 0;
@@ -513,6 +540,9 @@
 
     function render() {
       const s = calcState(trades, live);
+      const fees = inferFees(trades);
+      const hint = document.getElementById("autoFeeHint");
+      if (hint) hint.textContent = "کارمزد خودکار از معاملهٔ قبلی: شبکه " + fmt(fees.networkFee, 5) + " GRAM · DEX " + fmt(fees.dexFeePct, 2) + "٪";
       document.getElementById("livePrice").textContent = live != null ? fmt(live, 4) : "—";
       const pill = document.getElementById("chgPill");
       if (quote && quote.change24h != null) {
@@ -626,11 +656,16 @@
       const g = Number(document.getElementById("tGram").value);
       const u = Number(document.getElementById("tUsdt").value);
       const date = document.getElementById("tDate").value;
-      if (!date || !g || !u || g <= 0 || u <= 0) { toast("همه فیلدهای اصلی را پر کن"); return; }
+      if (!date || !g || !u || g <= 0 || u <= 0) { toast("مقدار GRAM و USDT را وارد کن"); return; }
+      if (tradeType === "sell") {
+        const avail = calcState(trades, null).totalGram;
+        if (g > avail + 1e-6) { toast("موجودی کافی نیست (حداکثر " + fmt(avail, 4) + " GRAM)"); return; }
+      }
+      const fees = inferFees(trades);
       trades.push({
         id: Date.now(), type: tradeType, date, gram: g, usdt: u,
-        networkFee: Number(document.getElementById("tFee").value) || NET,
-        dexFeePct: Number(document.getElementById("tDex").value) || DEX,
+        networkFee: fees.networkFee,
+        dexFeePct: fees.dexFeePct,
         price: u / g
       });
       saveTrades();
